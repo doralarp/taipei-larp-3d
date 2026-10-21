@@ -298,10 +298,12 @@ function showCinematicCard(tag, title, text, btnLabel = '確認', onConfirm = nu
 const canvas = document.getElementById('webgl');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0a1124');
-scene.fog = new THREE.FogExp2('#0a1124', 0.012);
+// 2.0 輕量線性霧氣 (Fog) 營造懸疑氛圍
+scene.fog = new THREE.FogExp2('#0e1628', 0.018);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
+// 2.0 DPR 上限鎖定 2.0，兼顧清晰度與手機省電溫控
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -310,14 +312,70 @@ renderer.toneMappingExposure = 1.05;
 
 const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 300);
 const CAM_OFFSET = new THREE.Vector3(22, 30, 24);
+let currentLookTarget = new THREE.Vector3(0, 0, 0);
 let cameraMode = 'iso';
 let controls = null;
+
+// 2.0 行動端手勢邊界規範 (OrbitControls)
 if (typeof THREE.OrbitControls !== 'undefined') {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enabled = false;
   controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.dampingFactor = 0.06;
+  controls.minPolarAngle = 0.25;                  // 防止頂視翻轉
+  controls.maxPolarAngle = Math.PI / 2 - 0.08;   // 嚴格防止俯視穿透地表
+  controls.minDistance = 10;                     // 最小縮放距
+  controls.maxDistance = 75;                     // 最大縮放距
+}
+
+// 輔助函式：建立接觸陰影 (Contact Shadow) 貼圖面片
+function createContactShadow(radiusX = 4, radiusZ = 4, opacity = 0.42) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+  grad.addColorStop(0.55, 'rgba(0, 0, 0, 0.6)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(radiusX, radiusZ);
+  const mat = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: opacity,
+    depthWrite: false
+  });
+  const plane = new THREE.Mesh(geo, mat);
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = 0.03;
+  return plane;
+}
+
+// 輔助函式：建立 Fake Bloom (霓虹光暈精靈)
+function createFakeBloom(colorHex = '#ffd25e', size = 3) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, colorHex);
+  grad.addColorStop(0.3, colorHex);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    opacity: 0.75
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(size, size, 1);
+  return sprite;
 }
 
 const ambientLight = new THREE.AmbientLight('#a5b4fc', 0.55);
@@ -551,6 +609,139 @@ AMENITIES.forEach(am => {
   });
 });
 
+
+// ==========================================
+// 8.5 空間微探索線索系統 (MINI-LARP CLUES)
+// ==========================================
+const CLUE_DEFINITIONS = [
+  {
+    id: 'clue_magnifier',
+    name: '福爾摩斯的黃銅放大鏡',
+    icon: '🔍',
+    x: 18, z: 12,
+    stat: 'logic',
+    val: 5,
+    col: '#38bdf8',
+    desc: '在410檔案室後巷石階發現的微型放大鏡，鏡片依稀映著未解之謎。'
+  },
+  {
+    id: 'clue_letter',
+    name: '泛黃的告白手寫信',
+    icon: '✉️',
+    x: 6, z: -25,
+    stat: 'heart',
+    val: 5,
+    col: '#f43f5e',
+    desc: '從前從前門口櫻花樹下撿到的情書，字跡溫柔卻未曾寄出。'
+  },
+  {
+    id: 'clue_cipher',
+    name: '達文西機關密碼盒',
+    icon: '🔐',
+    x: 15, z: -21,
+    stat: 'mech',
+    val: 5,
+    col: '#f59e0b',
+    desc: '衛斯理天祥石柱旁遺落的黃銅齒輪盒，轉動時發出清脆金屬聲。'
+  },
+  {
+    id: 'clue_candle',
+    name: '不熄之微恐燭台',
+    icon: '🕯️',
+    x: 26, z: -15,
+    stat: 'nerve',
+    val: 5,
+    col: '#10b981',
+    desc: '玩硬劇本巷口的微恐道具燭台，在風中幽幽散發綠色微光。'
+  }
+];
+
+const clueMeshes = [];
+
+CLUE_DEFINITIONS.forEach(cDef => {
+  const cGroup = new THREE.Group();
+  cGroup.position.set(cDef.x, 0, cDef.z);
+
+  // 浮動基座光環
+  const ringGeo = new THREE.RingGeometry(0.3, 0.7, 24);
+  const ringMat = new THREE.MeshBasicMaterial({ color: cDef.col, side: THREE.DoubleSide, transparent: true, opacity: 0.7 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  cGroup.add(ring);
+
+  // 道具模型 (以低多邊形組合)
+  const itemGeo = new THREE.OctahedronGeometry(0.45, 0);
+  const itemMat = new THREE.MeshStandardMaterial({
+    color: cDef.col,
+    emissive: cDef.col,
+    emissiveIntensity: 0.35,
+    roughness: 0.3
+  });
+  const itemMesh = new THREE.Mesh(itemGeo, itemMat);
+  itemMesh.position.y = 1.1;
+  cGroup.add(itemMesh);
+
+  // Fake Bloom
+  const halo = createFakeBloom(cDef.col, 2.2);
+  halo.position.y = 1.1;
+  cGroup.add(halo);
+
+  // 接觸陰影
+  const cs = createContactShadow(1.4, 1.4, 0.5);
+  cGroup.add(cs);
+
+  scene.add(cGroup);
+
+  const isCollected = S.clues && S.clues.includes(cDef.id);
+  if (isCollected) cGroup.visible = false;
+
+  const clueObj = {
+    def: cDef,
+    group: cGroup,
+    itemMesh: itemMesh,
+    pos: new THREE.Vector3(cDef.x, 0, cDef.z),
+    interact: () => collectClue(cDef, clueObj)
+  };
+
+  clueMeshes.push(clueObj);
+
+  interactiveObjects.push({
+    type: 'clue',
+    name: cDef.name,
+    pos: clueObj.pos,
+    interact: clueObj.interact
+  });
+});
+
+function collectClue(cDef, clueObj) {
+  if (!S.clues) S.clues = [];
+  if (S.clues.includes(cDef.id)) return;
+
+  S.clues.push(cDef.id);
+  S[cDef.stat] = (S[cDef.stat] || 20) + cDef.val;
+  clueObj.group.visible = false;
+  AudioEngine.playLevel();
+  saveState();
+  updateHUD();
+
+  showToast(`✨ 拾獲線索【${cDef.name}】！${STAT_NAMES[cDef.stat]} +${cDef.val}`);
+
+  // 檢查是否集滿 4 個線索
+  if (S.clues.length >= CLUE_DEFINITIONS.length) {
+    setTimeout(() => {
+      openEventCard(
+        '🏆 解謎大師 · 全線索收集完成',
+        '你在台北劇本殺街區成功破解了所有微型線索道具！獲得圈內傳奇稱號與專屬 9 折優惠代碼：【DORA3D90】。快向店家主持人出示領取專屬福利！',
+        'MINI-LARP EASTER EGG'
+      );
+      S.rep = Math.min(100, S.rep + 15);
+      saveState();
+      updateHUD();
+    }, 600);
+  }
+}
+
 // ==========================================
 // 9. 3D CHIBI CHARACTERS & ANIMATION
 // ==========================================
@@ -762,6 +953,56 @@ document.getElementById('btn-room-job').onclick = () => {
 // 11. SCRIPT BROWSING, PLAYING & CRITICAL MOMENT
 // ==========================================
 let currentFilter = 'all';
+
+
+// 2.0 篩選視角聯動：劇本標籤聯動 3D 霓虹光柱與半透明聚焦
+function apply3DFilterBeacons(filterType) {
+  S.activeFilter = filterType;
+  storeMeshes.forEach(sm => {
+    const st = sm.data;
+    if (filterType === 'all') {
+      sm.bldgMat.opacity = 1.0;
+      sm.bldgMat.transparent = false;
+      if (sm.beacon) {
+        sm.beacon.visible = false;
+        sm.beaconMat.opacity = 0;
+      }
+      return;
+    }
+
+    // 檢查是否有對應類型的劇本
+    const hasMatch = st.c && st.c.some(item => {
+      const tags = (item[1] || '').toLowerCase();
+      if (filterType === 'logic' && (tags.includes('推理') || tags.includes('還原') || tags.includes('硬核'))) return true;
+      if (filterType === 'heart' && (tags.includes('情感') || tags.includes('沉浸') || tags.includes('立意'))) return true;
+      if (filterType === 'nerve' && (tags.includes('恐怖') || tags.includes('驚悚') || tags.includes('變格'))) return true;
+      if (filterType === 'mech' && (tags.includes('機制') || tags.includes('陣營') || tags.includes('博弈'))) return true;
+      return false;
+    });
+
+    if (hasMatch) {
+      sm.bldgMat.opacity = 1.0;
+      sm.bldgMat.transparent = false;
+      if (sm.beacon) {
+        sm.beacon.visible = true;
+        sm.beaconMat.opacity = 0.65;
+        // 依類型改變光柱色彩
+        if (filterType === 'logic') sm.beaconMat.color.set('#38bdf8');
+        else if (filterType === 'heart') sm.beaconMat.color.set('#f43f5e');
+        else if (filterType === 'nerve') sm.beaconMat.color.set('#a855f7');
+        else if (filterType === 'mech') sm.beaconMat.color.set('#f59e0b');
+      }
+    } else {
+      // 非選中店家半透明暗化
+      sm.bldgMat.transparent = true;
+      sm.bldgMat.opacity = 0.32;
+      if (sm.beacon) {
+        sm.beacon.visible = false;
+        sm.beaconMat.opacity = 0;
+      }
+    }
+  });
+}
 
 function openScriptBrowser(st) {
   AudioEngine.sfx('click');
@@ -1502,6 +1743,20 @@ function checkImmediateInteraction() {
   }
 }
 
+
+// 2.0 右下角「重設視角」一鍵復位
+document.getElementById('btn-reset-cam').onclick = () => {
+  cameraMode = 'iso';
+  if (controls) controls.enabled = false;
+  document.getElementById('btn-cam').textContent = '📷 俯視';
+  smoothMoveCamera(
+    player.pos.clone().add(CAM_OFFSET),
+    player.pos.clone(),
+    0.75
+  );
+  showToast('🧭 視角已重設為最佳等角視角。');
+};
+
 document.getElementById('btn-cam').onclick = () => {
   if (cameraMode === 'iso') {
     cameraMode = 'orbit';
@@ -1583,20 +1838,53 @@ function animate() {
   player.pos.z = Math.max(-65, Math.min(65, player.pos.z));
   playerModel.group.position.copy(player.pos);
 
-  if (cameraMode === 'iso') {
+  // 2.0 相機平滑插值動畫 (Camera Tween)
+  if (cameraAnim) {
+    const elapsed = performance.now() - cameraAnim.startTime;
+    const progress = Math.min(elapsed / cameraAnim.duration, 1.0);
+    // Ease-in-out cosine curve
+    const ease = 0.5 - 0.5 * Math.cos(progress * Math.PI);
+
+    camera.position.lerpVectors(cameraAnim.startPos, cameraAnim.endPos, ease);
+    currentLookTarget.lerpVectors(cameraAnim.startLook, cameraAnim.endLook, ease);
+    camera.lookAt(currentLookTarget);
+
+    if (progress >= 1.0) {
+      if (cameraAnim.onComplete) cameraAnim.onComplete();
+      cameraAnim = null;
+    }
+  } else if (cameraMode === 'iso') {
     const targetCam = player.pos.clone().add(CAM_OFFSET);
     camera.position.lerp(targetCam, 0.08);
-    camera.lookAt(player.pos);
+    currentLookTarget.lerp(player.pos, 0.08);
+    camera.lookAt(currentLookTarget);
   } else if (cameraMode === 'top') {
     const targetCam = player.pos.clone().add(new THREE.Vector3(0, 48, 0.1));
     camera.position.lerp(targetCam, 0.08);
-    camera.lookAt(player.pos);
+    currentLookTarget.lerp(player.pos, 0.08);
+    camera.lookAt(currentLookTarget);
   } else if (cameraMode === 'orbit') {
     if (controls) {
       controls.target.lerp(player.pos, 0.05);
       controls.update();
     }
   }
+
+  // 2.0 線索道具微旋轉與懸浮動效
+  clueMeshes.forEach(cm => {
+    if (cm.group.visible) {
+      cm.itemMesh.rotation.y += dt * 2.2;
+      cm.itemMesh.position.y = 1.1 + Math.sin(now * 0.003 + cm.pos.x) * 0.12;
+    }
+  });
+
+  // 2.0 霓虹光柱動態脈衝
+  storeMeshes.forEach(sm => {
+    if (sm.beacon && sm.beacon.visible) {
+      sm.beacon.rotation.y += dt * 0.6;
+      sm.beaconMat.opacity = 0.5 + Math.sin(now * 0.004) * 0.22;
+    }
+  });
 
   npcList.forEach(npc => {
     npc.patrolTimer -= dt;
