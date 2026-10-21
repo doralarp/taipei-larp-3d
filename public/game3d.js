@@ -283,6 +283,48 @@ document.getElementById('modal-close-btn').onclick = closeModal;
 
 // ---------- 2.0 抽屜式卡片管理 (Bottom Sheet Manager) ----------
 const bottomSheet = document.getElementById('bottom-sheet');
+
+function openStoreBottomSheet(st) {
+  AudioEngine.sfx('click');
+  const scripts = st.c || [];
+  const bodyHtml = `
+    <div style="font-size:13px; color:#cbd5e1; line-height:1.6; margin-bottom:12px;">
+      📍 地址：${st.loc || '台北市區'}<br>
+      🎭 館藏劇本：<b style="color:var(--gold);">${scripts.length}</b> 部劇本殺作品<br>
+      ⭐ 推薦熱門：${scripts.slice(0, 3).map(s => s[0]).join('、') || '經典推理'}
+    </div>
+  `;
+
+  openBottomSheet(
+    `🎭 ${st.n}`,
+    `${st.loc || '台北市'} · 劇本殺旗艦館`,
+    bodyHtml,
+    [
+      {
+        label: '🚪 進入 3D 店內探索',
+        primary: true,
+        onClick: () => {
+          closeBottomSheet();
+          enterStore(st);
+        }
+      },
+      {
+        label: '📜 瀏覽劇本庫',
+        primary: false,
+        onClick: () => {
+          closeBottomSheet();
+          openScriptBrowser(st);
+        }
+      },
+      {
+        label: '關閉',
+        primary: false,
+        onClick: () => closeBottomSheet()
+      }
+    ]
+  );
+}
+
 const sheetScrim = document.getElementById('sheet-scrim');
 const sheetCloseBtn = document.getElementById('sheet-close-btn');
 
@@ -3068,3 +3110,11 @@ window.addEventListener('resize', () => {
 updateHUD();
 animate();
 showToast('✨ 歡迎來到《台北劇本殺物語 3D》！WASD 或點擊地面自由移動。');
+
+window.enterStore = enterStore;
+window.exitStore = exitStore;
+window.openStoreBottomSheet = openStoreBottomSheet;
+window.STORES = STORES;
+window.renderer = renderer;
+window.scene = scene;
+window.camera = camera;

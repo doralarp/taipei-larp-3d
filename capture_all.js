@@ -26,8 +26,8 @@ async function run() {
   console.log('Navigating to live URL...');
   await page.goto('https://taipei-larp-3d.veryhoya.workers.dev/', { waitUntil: 'networkidle2', timeout: 30000 });
 
-  // Wait 3.5s for 3D world to render
-  await new Promise(r => setTimeout(r, 3500));
+  // Wait 3s for 3D world to render
+  await new Promise(r => setTimeout(r, 3000));
 
   // Extract WebGL metrics
   const metrics = await page.evaluate(() => {
@@ -43,12 +43,12 @@ async function run() {
     }
     return null;
   });
-  console.log('Renderer info:', JSON.stringify(metrics, null, 2));
+  console.log('WebGL Renderer metrics:', JSON.stringify(metrics, null, 2));
 
   // Capture outdoor street shot
   const outPath1 = path.join(__dirname, 'docs', 'live_street_v3.png');
   await page.screenshot({ path: outPath1 });
-  console.log('Saved:', outPath1);
+  console.log('Saved outdoor:', outPath1);
 
   // Copy to brain artifact directory so it can be viewed
   const artifactDir = 'C:\\Users\\T_T\\.gemini\\antigravity\\brain\\8f46527a-86ff-48cc-b5c0-c96233634e2a';
@@ -57,12 +57,13 @@ async function run() {
   // Now trigger entering indoor room mode
   console.log('Entering Flagship LARP parlor room...');
   await page.evaluate(() => {
-    if (typeof window.enterStore3DRoom === 'function') {
-      window.enterStore3DRoom(0); // Enter 410檔案室
+    if (typeof window.enterStore === 'function' && window.STORES) {
+      window.enterStore(window.STORES[0]);
     }
   });
 
-  await new Promise(r => setTimeout(r, 1500));
+  // Wait 2.5s for smooth camera transition to complete
+  await new Promise(r => setTimeout(r, 2500));
 
   const outPath2 = path.join(__dirname, 'docs', 'live_indoor_room.png');
   await page.screenshot({ path: outPath2 });
@@ -70,7 +71,7 @@ async function run() {
   fs.copyFileSync(outPath2, path.join(artifactDir, 'live_indoor_room.png'));
 
   await browser.close();
-  console.log('Done! Captured all scenes.');
+  console.log('Done! Captured both scenes successfully.');
 }
 
 run().catch(err => {
