@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "echo 'Build complete'"
+    "build": "echo 'Build complete'",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "keywords": [
     "larp",
@@ -18,5 +20,8 @@
   "license": "ISC",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.151.3"
   }
 }

@@ -115,6 +115,9 @@ const AudioEngine = {
     } catch (e) {}
   },
 
+  playClick() { this.sfx('click'); },
+  playLevel() { this.sfx('levelup'); },
+  playCoin() { this.sfx('coin'); },
   sfx(name) {
     if (!this.ctx || !this.enabled) return;
     const now = this.ctx.currentTime + 0.01;
@@ -278,6 +281,65 @@ function closeModal() {
 
 document.getElementById('modal-close-btn').onclick = closeModal;
 
+// ---------- 2.0 抽屜式卡片管理 (Bottom Sheet Manager) ----------
+const bottomSheet = document.getElementById('bottom-sheet');
+const sheetScrim = document.getElementById('sheet-scrim');
+const sheetCloseBtn = document.getElementById('sheet-close-btn');
+
+function openBottomSheet(title, sub, bodyHtml, actionButtons = []) {
+  if (!bottomSheet) return;
+  const t = document.getElementById('sheet-title');
+  const s = document.getElementById('sheet-sub');
+  const b = document.getElementById('sheet-body');
+  const f = document.getElementById('sheet-footer');
+  if (t) t.textContent = title;
+  if (s) s.textContent = sub || '';
+  if (b) b.innerHTML = bodyHtml;
+  if (f) {
+    f.innerHTML = '';
+    actionButtons.forEach(btnDef => {
+      const btn = document.createElement('button');
+      btn.className = btnDef.primary ? 'btn-primary' : 'btn-secondary';
+      btn.textContent = btnDef.label || btnDef.text;
+      btn.onclick = () => {
+        if (btnDef.onClick) btnDef.onClick();
+        if (!btnDef.preventClose) closeBottomSheet();
+      };
+      f.appendChild(btn);
+    });
+  }
+  bottomSheet.hidden = false;
+  requestAnimationFrame(() => {
+    bottomSheet.classList.add('open');
+  });
+}
+
+function closeBottomSheet() {
+  if (!bottomSheet) return;
+  bottomSheet.classList.remove('open');
+  setTimeout(() => {
+    bottomSheet.hidden = true;
+  }, 320);
+}
+
+if (sheetCloseBtn) sheetCloseBtn.onclick = closeBottomSheet;
+if (sheetScrim) sheetScrim.onclick = closeBottomSheet;
+
+// ---------- 2.0 鏡頭平滑過渡 (Camera Lerp / Tween) ----------
+let cameraAnim = null; // { startPos, endPos, startLook, endLook, startTime, duration, onComplete }
+
+function smoothMoveCamera(endPos, endLook, duration = 0.8, onComplete = null) {
+  cameraAnim = {
+    startPos: camera.position.clone(),
+    endPos: endPos.clone(),
+    startLook: (typeof currentLookTarget !== 'undefined' ? currentLookTarget : player.pos).clone(),
+    endLook: endLook.clone(),
+    startTime: performance.now(),
+    duration: duration * 1000,
+    onComplete
+  };
+}
+
 function showCinematicCard(tag, title, text, btnLabel = '確認', onConfirm = null) {
   AudioEngine.sfx('win');
   document.getElementById('event-card-tag').textContent = tag || 'MILESTONE · 重要時刻';
@@ -313,6 +375,8 @@ renderer.toneMappingExposure = 1.05;
 const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 300);
 const CAM_OFFSET = new THREE.Vector3(22, 30, 24);
 let currentLookTarget = new THREE.Vector3(0, 0, 0);
+camera.position.copy(CAM_OFFSET);
+camera.lookAt(currentLookTarget);
 let cameraMode = 'iso';
 let controls = null;
 
