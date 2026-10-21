@@ -355,56 +355,58 @@ function showCinematicCard(tag, title, text, btnLabel = '確認', onConfirm = nu
 }
 
 // ==========================================
-// 5. THREE.JS 3D SCENE & ENGINE
+// ==========================================
+// 5. THREE.JS 3D SCENE & ENGINE (TAIPEI NIGHT DIORAMA)
 // ==========================================
 const canvas = document.getElementById('webgl');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#0a1124');
-// 2.0 輕量線性霧氣 (Fog) 營造懸疑氛圍
-scene.fog = new THREE.FogExp2('#0e1628', 0.018);
+// 台北夜霓虹 / 微醺懸疑背景色與漸層霧氣
+scene.background = new THREE.Color('#12121c');
+scene.fog = new THREE.FogExp2('#0e0e16', 0.015);
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setSize(window.innerWidth, window.innerHeight);
-// 2.0 DPR 上限鎖定 2.0，兼顧清晰度與手機省電溫控
+// DPR 上限鎖死 2.0，兼顧手機極致流暢與省電
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.15;
 
-const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.5, 300);
-const CAM_OFFSET = new THREE.Vector3(22, 30, 24);
+// 微縮模型透視相機 (Toytown / Orthographic-like Perspective)
+const camera = new THREE.PerspectiveCamera(34, window.innerWidth / window.innerHeight, 0.5, 300);
+const CAM_OFFSET = new THREE.Vector3(25, 30, 26);
 let currentLookTarget = new THREE.Vector3(0, 0, 0);
 camera.position.copy(CAM_OFFSET);
 camera.lookAt(currentLookTarget);
 let cameraMode = 'iso';
 let controls = null;
 
-// 2.0 行動端手勢邊界規範 (OrbitControls)
+// 行動端手勢與視角限制 (鎖定最美觀的微縮模型視角)
 if (typeof THREE.OrbitControls !== 'undefined') {
   controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enabled = false;
   controls.enableDamping = true;
   controls.dampingFactor = 0.06;
-  controls.minPolarAngle = 0.25;                  // 防止頂視翻轉
-  controls.maxPolarAngle = Math.PI / 2 - 0.08;   // 嚴格防止俯視穿透地表
-  controls.minDistance = 10;                     // 最小縮放距
-  controls.maxDistance = 75;                     // 最大縮放距
+  controls.minPolarAngle = 0.52;                 // 限制最小俯角，避免完全頂視
+  controls.maxPolarAngle = 1.18;                 // 限制最大俯角，絕不穿透地表且保持立體感
+  controls.minDistance = 14;                     // 限制最近距離
+  controls.maxDistance = 55;                     // 限制最遠距離，避免迷失於虛無
 }
 
 // 輔助函式：建立接觸陰影 (Contact Shadow) 貼圖面片
-function createContactShadow(radiusX = 4, radiusZ = 4, opacity = 0.42) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
+function createContactShadow(radiusX = 4, radiusZ = 4, opacity = 0.52) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
   const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-  grad.addColorStop(0.55, 'rgba(0, 0, 0, 0.6)');
+  grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.65)');
   grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 64, 64);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = new THREE.CanvasTexture(c);
   const geo = new THREE.PlaneGeometry(radiusX, radiusZ);
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
@@ -420,91 +422,287 @@ function createContactShadow(radiusX = 4, radiusZ = 4, opacity = 0.42) {
 
 // 輔助函式：建立 Fake Bloom (霓虹光暈精靈)
 function createFakeBloom(colorHex = '#ffd25e', size = 3) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64; canvas.height = 64;
-  const ctx = canvas.getContext('2d');
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
   const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
   grad.addColorStop(0, colorHex);
-  grad.addColorStop(0.3, colorHex);
+  grad.addColorStop(0.35, colorHex);
   grad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 64, 64);
 
-  const tex = new THREE.CanvasTexture(canvas);
+  const tex = new THREE.CanvasTexture(c);
   const mat = new THREE.SpriteMaterial({
     map: tex,
     transparent: true,
     blending: THREE.AdditiveBlending,
-    opacity: 0.75
+    opacity: 0.78
   });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(size, size, 1);
   return sprite;
 }
 
-const ambientLight = new THREE.AmbientLight('#a5b4fc', 0.55);
+// 輔助函式：建立台北風格發光霓虹招牌材質 (Procedural CanvasTexture)
+function createNeonSignTexture(text, fgColor = '#00f5d4', bgColor = '#090d18', isVertical = true) {
+  const c = document.createElement('canvas');
+  if (isVertical) {
+    c.width = 128;
+    c.height = 384;
+  } else {
+    c.width = 384;
+    c.height = 128;
+  }
+  const ctx = c.getContext('2d');
+
+  // 深色底板
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  // 霓虹邊框
+  ctx.strokeStyle = fgColor;
+  ctx.lineWidth = 6;
+  ctx.strokeRect(6, 6, c.width - 12, c.height - 12);
+
+  // 內部白色高光細線
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(9, 9, c.width - 18, c.height - 18);
+
+  // 霓虹文字發光
+  ctx.shadowColor = fgColor;
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (isVertical) {
+    ctx.font = 'bold 50px "Noto Sans TC", sans-serif';
+    const chars = text.split('');
+    const step = (c.height - 40) / chars.length;
+    chars.forEach((ch, idx) => {
+      ctx.fillText(ch, c.width / 2, 32 + step * (idx + 0.5));
+    });
+  } else {
+    ctx.font = 'bold 46px "Noto Sans TC", sans-serif';
+    ctx.fillText(text, c.width / 2, c.height / 2 + 2);
+  }
+
+  const texture = new THREE.CanvasTexture(c);
+  texture.anisotropy = 4;
+  return texture;
+}
+
+// 輔助函式：建立 3D POI 懸浮標記 (面具 / 放大鏡 / 鑰匙)
+const animatedPins = [];
+
+function create3DPOIPin(type = 'mask', color = '#ffb703') {
+  const pinGroup = new THREE.Group();
+
+  // 1. 地面環形光圈 (Glowing Base Ring)
+  const ringGeo = new THREE.RingGeometry(0.85, 1.45, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.75,
+    blending: THREE.AdditiveBlending
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.04;
+  pinGroup.add(ring);
+
+  // 2. 懸浮主體 (Floating Stem & Icon)
+  const stem = new THREE.Group();
+  stem.position.y = 3.6;
+
+  // 圓形發光背景盾牌 (Speech Bubble Badge)
+  const badgeGeo = new THREE.CylinderGeometry(1.25, 1.25, 0.22, 24);
+  badgeGeo.rotateX(Math.PI / 2);
+  const badgeMat = new THREE.MeshStandardMaterial({
+    color: '#16192b',
+    emissive: color,
+    emissiveIntensity: 0.22,
+    roughness: 0.35,
+    metalness: 0.3
+  });
+  const badge = new THREE.Mesh(badgeGeo, badgeMat);
+  stem.add(badge);
+
+  // 盾牌外圍發光環
+  const rimGeo = new THREE.TorusGeometry(1.28, 0.07, 8, 32);
+  const rimMat = new THREE.MeshBasicMaterial({ color: color, blending: THREE.AdditiveBlending });
+  const rim = new THREE.Mesh(rimGeo, rimMat);
+  stem.add(rim);
+
+  // 下方小指標箭頭
+  const tipGeo = new THREE.ConeGeometry(0.35, 0.7, 16);
+  tipGeo.rotateZ(Math.PI);
+  const tipMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3 });
+  const tip = new THREE.Mesh(tipGeo, tipMat);
+  tip.position.y = -1.45;
+  stem.add(tip);
+
+  // 3. 3D 立體圖標 (Drama Mask / Magnifier / Key)
+  if (type === 'mask') {
+    // 🎭 3D 戲劇面具
+    const maskGrp = new THREE.Group();
+    const faceGeo = new THREE.SphereGeometry(0.72, 16, 12, 0, Math.PI, 0, Math.PI * 0.85);
+    const faceMat = new THREE.MeshStandardMaterial({
+      color: '#fef08a',
+      emissive: '#d97706',
+      emissiveIntensity: 0.35,
+      roughness: 0.3
+    });
+    const face = new THREE.Mesh(faceGeo, faceMat);
+    face.rotation.y = -Math.PI / 2;
+    face.scale.set(0.55, 1.15, 0.8);
+    face.position.z = 0.15;
+    maskGrp.add(face);
+
+    // 雙眼孔 (暗色凹槽)
+    const eyeMat = new THREE.MeshBasicMaterial({ color: '#090d16' });
+    const eyeGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.24, 8);
+    const e1 = new THREE.Mesh(eyeGeo, eyeMat);
+    e1.position.set(-0.24, 0.18, 0.4);
+    e1.rotation.z = 0.25;
+    const e2 = new THREE.Mesh(eyeGeo, eyeMat);
+    e2.position.set(0.24, 0.18, 0.4);
+    e2.rotation.z = -0.25;
+    maskGrp.add(e1, e2);
+
+    // 微笑嘴唇弧線
+    const smileGeo = new THREE.TorusGeometry(0.22, 0.045, 8, 12, Math.PI * 0.85);
+    const smile = new THREE.Mesh(smileGeo, eyeMat);
+    smile.rotation.x = Math.PI;
+    smile.position.set(0, -0.15, 0.4);
+    maskGrp.add(smile);
+
+    stem.add(maskGrp);
+  } else if (type === 'magnifier') {
+    // 🔍 3D 放大鏡
+    const magGrp = new THREE.Group();
+    const rimMGeo = new THREE.TorusGeometry(0.52, 0.07, 8, 24);
+    const goldMat = new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.8, roughness: 0.2 });
+    const magRim = new THREE.Mesh(rimMGeo, goldMat);
+    magRim.position.z = 0.18;
+    magGrp.add(magRim);
+
+    const lensGeo = new THREE.CircleGeometry(0.5, 20);
+    const lensMat = new THREE.MeshStandardMaterial({ color: '#38bdf8', transparent: true, opacity: 0.65, roughness: 0.1 });
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.position.z = 0.18;
+    magGrp.add(lens);
+
+    const handleGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.65, 8);
+    const woodMat = new THREE.MeshStandardMaterial({ color: '#78350f', roughness: 0.5 });
+    const handle = new THREE.Mesh(handleGeo, woodMat);
+    handle.rotation.z = -Math.PI / 4;
+    handle.position.set(0.5, -0.5, 0.18);
+    magGrp.add(handle);
+
+    stem.add(magGrp);
+  } else if (type === 'key') {
+    // 🗝️ 3D 金色鑰匙
+    const keyGrp = new THREE.Group();
+    const bowGeo = new THREE.TorusGeometry(0.28, 0.06, 8, 20);
+    const keyMat = new THREE.MeshStandardMaterial({ color: '#fbbf24', metalness: 0.8, roughness: 0.2 });
+    const bow = new THREE.Mesh(bowGeo, keyMat);
+    bow.position.set(0, 0.38, 0.18);
+    keyGrp.add(bow);
+
+    const shaftGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.85, 8);
+    const shaft = new THREE.Mesh(shaftGeo, keyMat);
+    shaft.position.set(0, -0.12, 0.18);
+    keyGrp.add(shaft);
+
+    const bit1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.05), keyMat);
+    bit1.position.set(0.1, -0.4, 0.18);
+    keyGrp.add(bit1);
+
+    stem.add(keyGrp);
+  }
+
+  pinGroup.add(stem);
+  pinGroup.stem = stem;
+  animatedPins.push(pinGroup);
+  return pinGroup;
+}
+
+// 台北夜間氛圍光照配置 (微醺懸疑冷暖對比)
+const ambientLight = new THREE.AmbientLight('#18182e', 0.85);
 scene.add(ambientLight);
 
-const sunLight = new THREE.DirectionalLight('#fff7ed', 1.25);
-sunLight.position.set(30, 50, 30);
+// 主方向月光與建築側光 (冷色調藍紫陰影)
+const sunLight = new THREE.DirectionalLight('#6366f1', 1.05);
+sunLight.position.set(35, 52, 35);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 sunLight.shadow.camera.near = 0.5;
 sunLight.shadow.camera.far = 160;
-sunLight.shadow.camera.left = -45;
-sunLight.shadow.camera.right = 45;
-sunLight.shadow.camera.top = 45;
-sunLight.shadow.camera.bottom = -45;
-sunLight.shadow.bias = -0.0005;
+sunLight.shadow.camera.left = -50;
+sunLight.shadow.camera.right = 50;
+sunLight.shadow.camera.top = 50;
+sunLight.shadow.camera.bottom = -50;
+sunLight.shadow.bias = -0.0004;
 scene.add(sunLight);
 
-const hemiLight = new THREE.HemisphereLight('#818cf8', '#1e1b4b', 0.4);
+// 半球光 (天光深紫、地光墨黑)
+const hemiLight = new THREE.HemisphereLight('#312e81', '#0a0a14', 0.55);
 scene.add(hemiLight);
 
 function updateDayNightCycle() {
   const tFrac = (S.min - 9 * 60) / (15 * 60);
   const angle = Math.PI * 0.15 + tFrac * Math.PI * 0.7;
-  sunLight.position.x = Math.cos(angle) * 60;
-  sunLight.position.y = Math.sin(angle) * 55;
-  sunLight.position.z = Math.sin(angle * 0.8) * 45;
+  sunLight.position.x = Math.cos(angle) * 55;
+  sunLight.position.y = Math.sin(angle) * 50;
+  sunLight.position.z = Math.sin(angle * 0.8) * 40;
 
   if (S.min < 11 * 60) {
     sunLight.color.set('#fde68a');
-    ambientLight.color.set('#c7d2fe');
-    sunLight.intensity = 1.1;
+    ambientLight.color.set('#272746');
+    sunLight.intensity = 1.05;
   } else if (S.min < 17 * 60) {
     sunLight.color.set('#ffffff');
-    ambientLight.color.set('#e0e7ff');
-    sunLight.intensity = 1.35;
+    ambientLight.color.set('#2e3058');
+    sunLight.intensity = 1.25;
   } else if (S.min < 19 * 60) {
     sunLight.color.set('#f97316');
-    ambientLight.color.set('#a855f7');
-    sunLight.intensity = 0.9;
+    ambientLight.color.set('#3b2d54');
+    sunLight.intensity = 0.95;
   } else {
-    sunLight.color.set('#38bdf8');
-    ambientLight.color.set('#1e1b4b');
-    sunLight.intensity = 0.35;
+    // 台北夜間：深夜霓虹聚焦
+    sunLight.color.set('#6366f1');
+    ambientLight.color.set('#16162a');
+    sunLight.intensity = 0.55;
   }
 }
 
 // ==========================================
-// 6. 3D CITY MAP BUILDER (TAIPEI DISTRICT)
+// 6. 3D CITY MAP BUILDER (TAIPEI DISTRICT DIORAMA)
 // ==========================================
 const cityGroup = new THREE.Group();
 scene.add(cityGroup);
 const interactiveObjects = [];
 
+// 1. 台北街區基座 (Diorama Base Platform)
 const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(160, 160),
-  new THREE.MeshStandardMaterial({ color: '#13192e', roughness: 0.88, metalness: 0.1 })
+  new THREE.BoxGeometry(160, 1.2, 160),
+  new THREE.MeshStandardMaterial({ color: '#0b0d17', roughness: 0.95, metalness: 0.05 })
 );
-ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.6;
 ground.receiveShadow = true;
 cityGroup.add(ground);
 
-const roadMat = new THREE.MeshStandardMaterial({ color: '#1f293d', roughness: 0.9 });
-const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#2e3a59', roughness: 0.75 });
+// 柏油馬路材質 (深灰瀝青路面)
+const roadMat = new THREE.MeshStandardMaterial({ color: '#161924', roughness: 0.92, metalness: 0.1 });
+// 人行道材質 (台北經典灰色鋪面)
+const sidewalkMat = new THREE.MeshStandardMaterial({ color: '#252a3a', roughness: 0.75, metalness: 0.1 });
+// 路緣石 (Curb)
+const curbMat = new THREE.MeshStandardMaterial({ color: '#383f56', roughness: 0.7 });
 
 function createRoadSegment(x, z, w, h) {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), roadMat);
@@ -512,68 +710,270 @@ function createRoadSegment(x, z, w, h) {
   mesh.position.set(x, 0.02, z);
   mesh.receiveShadow = true;
   cityGroup.add(mesh);
-}
 
-createRoadSegment(0, 0, 150, 10);
-createRoadSegment(0, 0, 10, 150);
-createRoadSegment(0, -32, 150, 8);
-createRoadSegment(0, 32, 150, 8);
-createRoadSegment(-32, 0, 8, 150);
-createRoadSegment(32, 0, 8, 150);
-
-for (let bx = -48; bx <= 48; bx += 32) {
-  for (let bz = -48; bz <= 48; bz += 32) {
-    if (Math.abs(bx) === 0 && Math.abs(bz) === 0) continue;
-    const sw = new THREE.Mesh(new THREE.BoxGeometry(22, 0.3, 22), sidewalkMat);
-    sw.position.set(bx, 0.15, bz);
-    sw.receiveShadow = true;
-    cityGroup.add(sw);
+  // 斑馬線 / 道路中心虛線 (Road markings)
+  if (w > h) {
+    const stripeCount = Math.floor(w / 6);
+    for (let i = 0; i < stripeCount; i++) {
+      const s = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.4, 0.35),
+        new THREE.MeshBasicMaterial({ color: '#cbd5e1' })
+      );
+      s.rotation.x = -Math.PI / 2;
+      s.position.set(x - w / 2 + 3 + i * 6, 0.025, z);
+      cityGroup.add(s);
+    }
+  } else {
+    const stripeCount = Math.floor(h / 6);
+    for (let i = 0; i < stripeCount; i++) {
+      const s = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.35, 2.4),
+        new THREE.MeshBasicMaterial({ color: '#cbd5e1' })
+      );
+      s.rotation.x = -Math.PI / 2;
+      s.position.set(x, 0.025, z - h / 2 + 3 + i * 6);
+      cityGroup.add(s);
+    }
   }
 }
 
-const treeTrunkMat = new THREE.MeshStandardMaterial({ color: '#543d2b', roughness: 0.9 });
-const treeFoliageMat = new THREE.MeshStandardMaterial({ color: '#10b981', roughness: 0.6 });
+// 主幹道十字交匯與次要巷弄
+createRoadSegment(0, 0, 150, 11);
+createRoadSegment(0, 0, 11, 150);
+createRoadSegment(0, -32, 150, 8.5);
+createRoadSegment(0, 32, 150, 8.5);
+createRoadSegment(-32, 0, 8.5, 150);
+createRoadSegment(32, 0, 8.5, 150);
+
+// 人行道街區底座 (Sidewalk Blocks with Curb Bevel)
+for (let bx = -48; bx <= 48; bx += 32) {
+  for (let bz = -48; bz <= 48; bz += 32) {
+    if (Math.abs(bx) === 0 && Math.abs(bz) === 0) continue;
+    // 人行道厚度
+    const sw = new THREE.Mesh(new THREE.BoxGeometry(21, 0.28, 21), sidewalkMat);
+    sw.position.set(bx, 0.14, bz);
+    sw.receiveShadow = true;
+    cityGroup.add(sw);
+
+    // 路緣石外框 (Curbs)
+    const curb = new THREE.Mesh(new THREE.BoxGeometry(21.4, 0.3, 21.4), curbMat);
+    curb.position.set(bx, 0.12, bz);
+    cityGroup.add(curb);
+  }
+}
+
+// 台北街頭特徵物件產生器 (Street Furniture)
+// 1. 機車 (Scooter)
+function createScooter(col = '#06b6d4') {
+  const sGrp = new THREE.Group();
+  const bMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.35 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.42, 1.2), bMat);
+  body.position.y = 0.35;
+  body.castShadow = true;
+  sGrp.add(body);
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.12, 0.65), new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.8 }));
+  seat.position.set(0, 0.58, -0.15);
+  sGrp.add(seat);
+
+  const front = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.6, 0.28), bMat);
+  front.position.set(0, 0.6, 0.45);
+  sGrp.add(front);
+
+  const headLight = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: '#fef08a' }));
+  headLight.position.set(0, 0.72, 0.6);
+  sGrp.add(headLight);
+
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.68, 6), new THREE.MeshStandardMaterial({ color: '#475569' }));
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, 0.95, 0.42);
+  sGrp.add(bar);
+
+  const wMat = new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.9 });
+  const wFront = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 10), wMat);
+  wFront.rotation.z = Math.PI / 2;
+  wFront.position.set(0, 0.18, 0.48);
+  const wRear = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 10), wMat);
+  wRear.rotation.z = Math.PI / 2;
+  wRear.position.set(0, 0.18, -0.42);
+  sGrp.add(wFront, wRear);
+
+  sGrp.add(createContactShadow(0.8, 1.6, 0.4));
+  return sGrp;
+}
+
+// 2. 台電彩繪變電箱 (Utility Power Box)
+function createUtilityBox(col = '#2563eb') {
+  const uGrp = new THREE.Group();
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.25, 0.65), new THREE.MeshStandardMaterial({ color: col, roughness: 0.5 }));
+  box.position.y = 0.65;
+  box.castShadow = true;
+  uGrp.add(box);
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.16, 0.75), new THREE.MeshStandardMaterial({ color: '#eab308', roughness: 0.6 }));
+  base.position.y = 0.08;
+  uGrp.add(base);
+
+  uGrp.add(createContactShadow(1.3, 1.1, 0.4));
+  return uGrp;
+}
+
+// 3. 黃色工程路障 (Yellow Road Barrier)
+function createRoadBarrier() {
+  const bGrp = new THREE.Group();
+  const barMat = new THREE.MeshStandardMaterial({ color: '#facc15', metalness: 0.4, roughness: 0.3 });
+
+  const rTop = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8), barMat);
+  rTop.rotation.z = Math.PI / 2;
+  rTop.position.y = 0.75;
+  const rBot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8), barMat);
+  rBot.rotation.z = Math.PI / 2;
+  rBot.position.y = 0.25;
+  bGrp.add(rTop, rBot);
+
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), new THREE.MeshStandardMaterial({ color: '#ca8a04', roughness: 0.5, side: THREE.DoubleSide }));
+  panel.position.y = 0.5;
+  bGrp.add(panel);
+
+  const l1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), barMat);
+  l1.position.set(-0.85, 0.42, 0);
+  const l2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), barMat);
+  l2.position.set(0.85, 0.42, 0);
+  bGrp.add(l1, l2);
+
+  return bGrp;
+}
+
+// 4. 台北溫暖路燈 (Taipei Warm Streetlamp with Light Cone)
+function createStreetlamp(x, z) {
+  const lGrp = new THREE.Group();
+  lGrp.position.set(x, 0, z);
+
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.14, 4.8, 8),
+    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.7, roughness: 0.3 })
+  );
+  pole.position.y = 2.4;
+  pole.castShadow = true;
+  lGrp.add(pole);
+
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.6, 0.2, 0.9),
+    new THREE.MeshStandardMaterial({ color: '#1e293b' })
+  );
+  head.position.set(0, 4.8, 0.3);
+  lGrp.add(head);
+
+  // 暖光燈泡
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), new THREE.MeshBasicMaterial({ color: '#ffbe0b' }));
+  bulb.position.set(0, 4.68, 0.3);
+  lGrp.add(bulb);
+
+  // Fake Bloom 暖色光暈
+  const bloom = createFakeBloom('#ffbe0b', 2.8);
+  bloom.position.set(0, 4.68, 0.3);
+  lGrp.add(bloom);
+
+  lGrp.add(createContactShadow(1.8, 1.8, 0.4));
+  cityGroup.add(lGrp);
+}
+
+// 沿主要街道佈設路燈
+[[-18, -6.5], [18, -6.5], [-18, 6.5], [18, 6.5], [-6.5, -18], [-6.5, 18], [6.5, -18], [6.5, 18]].forEach(([lx, lz]) => createStreetlamp(lx, lz));
+
+// 5. 街頭機車海與變電箱造景佈置
+const scooterColors = ['#06b6d4', '#ef4444', '#f59e0b', '#3b82f6', '#ec4899', '#f8fafc'];
+[
+  [12, 6.5, 0], [13.4, 6.5, 0.1], [14.8, 6.5, -0.05],
+  [-12, -6.5, Math.PI], [-13.4, -6.5, Math.PI + 0.1],
+  [6.5, 12, Math.PI / 2], [6.5, 13.5, Math.PI / 2 - 0.08],
+  [-6.5, 20, -Math.PI / 2], [-6.5, 21.5, -Math.PI / 2]
+].forEach(([sx, sz, rot], idx) => {
+  const sc = createScooter(scooterColors[idx % scooterColors.length]);
+  sc.position.set(sx, 0.15, sz);
+  sc.rotation.y = rot;
+  cityGroup.add(sc);
+});
+
+// 台電彩繪變電箱
+const ub1 = createUtilityBox('#2563eb');
+ub1.position.set(9.5, 0.15, 6.5);
+const ub2 = createUtilityBox('#10b981');
+ub2.position.set(10.6, 0.15, 6.5);
+const ub3 = createUtilityBox('#f59e0b');
+ub3.position.set(11.7, 0.15, 6.5);
+cityGroup.add(ub1, ub2, ub3);
+
+// 工程路障
+const bar1 = createRoadBarrier();
+bar1.position.set(-10, 0.15, 6.5);
+const bar2 = createRoadBarrier();
+bar2.position.set(-12, 0.15, 6.5);
+cityGroup.add(bar1, bar2);
+
+// 6. 街樹與盆栽造景
+const treeTrunkMat = new THREE.MeshStandardMaterial({ color: '#452b1b', roughness: 0.9 });
+const treeFoliageMat = new THREE.MeshStandardMaterial({ color: '#166534', roughness: 0.65 });
 
 function plantTree(x, z) {
   const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.8, 6), treeTrunkMat);
-  trunk.position.y = 0.9;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 2.2, 6), treeTrunkMat);
+  trunk.position.y = 1.1;
   trunk.castShadow = true;
   tree.add(trunk);
 
-  const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4, 1), treeFoliageMat);
-  foliage.position.y = 2.4;
+  const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5, 1), treeFoliageMat);
+  foliage.position.y = 2.8;
   foliage.castShadow = true;
   tree.add(foliage);
 
-  tree.position.set(x, 0, z);
+  // 花台石座
+  const planter = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 1.6), new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.7 }));
+  planter.position.y = 0.2;
+  tree.add(planter);
+
+  tree.add(createContactShadow(3.2, 3.2, 0.45));
+  tree.position.set(x, 0.15, z);
   cityGroup.add(tree);
 }
 
-[[-8, -8], [8, -8], [-8, 8], [8, 8], [-24, 2], [24, 2], [2, 24], [2, -24]].forEach(([tx, tz]) => plantTree(tx, tz));
+[[-7, -7], [7, -7], [-7, 7], [7, 7], [-24, 6.5], [24, -6.5], [6.5, 24], [-6.5, -24]].forEach(([tx, tz]) => plantTree(tx, tz));
 
-const bldMat1 = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.7 });
-const bldMat2 = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.6 });
+// 7. 台北背景建築群 (Background Shophouse Blocks)
+const bldMat1 = new THREE.MeshStandardMaterial({ color: '#1e2436', roughness: 0.7 });
+const bldMat2 = new THREE.MeshStandardMaterial({ color: '#272d42', roughness: 0.65 });
+const bldMat3 = new THREE.MeshStandardMaterial({ color: '#191e2e', roughness: 0.75 });
 
 function buildBlockBuilding(x, z, w, d, h) {
-  const bGroup = new THREE.Group();
-  const baseMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Math.random() < 0.5 ? bldMat1 : bldMat2);
-  baseMesh.position.y = h / 2;
-  baseMesh.castShadow = true;
-  baseMesh.receiveShadow = true;
-  bGroup.add(baseMesh);
+  const bGrp = new THREE.Group();
+  const mat = [bldMat1, bldMat2, bldMat3][Math.floor(Math.random() * 3)];
+  const bldg = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  bldg.position.y = h / 2;
+  bldg.castShadow = true;
+  bldg.receiveShadow = true;
+  bGrp.add(bldg);
 
-  const parapet = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, d), new THREE.MeshStandardMaterial({ color: '#0f172a' }));
-  parapet.position.y = h + 0.2;
-  bGroup.add(parapet);
+  // 女兒牆
+  const parapet = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), new THREE.MeshStandardMaterial({ color: '#0f172a' }));
+  parapet.position.y = h + 0.25;
+  bGrp.add(parapet);
 
-  const ac = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.2), new THREE.MeshStandardMaterial({ color: '#64748b' }));
-  ac.position.set((Math.random() - 0.5) * (w - 2), h + 0.4, (Math.random() - 0.5) * (d - 2));
-  ac.castShadow = true;
-  bGroup.add(ac);
+  // 屋頂設施：圓柱形白鐵水塔
+  const tank = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.7, 0.7, 1.4, 12),
+    new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.8, roughness: 0.2 })
+  );
+  tank.position.set((Math.random() - 0.5) * (w - 3), h + 0.9, (Math.random() - 0.5) * (d - 3));
+  bGrp.add(tank);
 
-  bGroup.position.set(x, 0, z);
-  cityGroup.add(bGroup);
+  // 冷氣室外機
+  const ac = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.8), new THREE.MeshStandardMaterial({ color: '#64748b' }));
+  ac.position.set((Math.random() - 0.5) * (w - 3), h + 0.5, (Math.random() - 0.5) * (d - 3));
+  bGrp.add(ac);
+
+  bGrp.add(createContactShadow(w + 3, d + 3, 0.5));
+  bGrp.position.set(x, 0, z);
+  cityGroup.add(bGrp);
 }
 
 const bldBlocks = [
@@ -583,54 +983,212 @@ const bldBlocks = [
   [-48, 48], [-16, 48], [16, 48], [48, 48]
 ];
 bldBlocks.forEach(([bx, bz]) => {
-  const h = 8 + Math.floor(Math.random() * 12);
+  const h = 9 + Math.floor(Math.random() * 11);
   buildBlockBuilding(bx, bz, 16, 16, h);
 });
 
 // ==========================================
-// 7. 14 REAL LARP STORES (3D LANDMARKS)
+// 7. 14 REAL LARP STORES (TAIPEI SHOPHOUSE ARCADES)
 // ==========================================
 const storeMeshes = [];
 
-STORES.forEach(st => {
-  const sGroup = new THREE.Group();
-  const sMat = new THREE.MeshStandardMaterial({ color: st.col, roughness: 0.5, metalness: 0.2 });
-  const sBld = new THREE.Mesh(new THREE.BoxGeometry(7, 5.5, 7), sMat);
-  sBld.position.y = 2.75;
-  sBld.castShadow = true;
-  sBld.receiveShadow = true;
-  sGroup.add(sBld);
+// 建立台北特色騎樓街屋 (Taipei Shophouse with Arcade & Neon Signs)
+function createTaipeiStoreBuilding(st) {
+  const bGrp = new THREE.Group();
+  const w = 8.2;
+  const d = 8.6;
+  const h = 13.0; // 4 層樓高
 
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: st.bgCol || '#1b2030',
+    roughness: 0.65,
+    metalness: 0.1
+  });
+
+  // 1. 一樓騎樓退縮空間 (Covered Arcade Walkway)
+  // 後方內縮店面玻璃門
+  const storeFront = new THREE.Mesh(
+    new THREE.BoxGeometry(w, 3.4, d - 3.2),
+    new THREE.MeshStandardMaterial({ color: '#131826', roughness: 0.5 })
+  );
+  storeFront.position.set(0, 1.7, -1.6);
+  storeFront.castShadow = true;
+  storeFront.receiveShadow = true;
+  bGrp.add(storeFront);
+
+  // 門口玻璃發光大門
   const door = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.4, 3.2),
-    new THREE.MeshStandardMaterial({ color: '#ffd25e', emissive: '#ffd25e', emissiveIntensity: 0.6 })
+    new THREE.PlaneGeometry(2.6, 2.8),
+    new THREE.MeshStandardMaterial({
+      color: '#fef08a',
+      emissive: st.accent || '#f59e0b',
+      emissiveIntensity: 0.75,
+      roughness: 0.2
+    })
   );
-  door.position.set(0, 1.6, 3.52);
-  sGroup.add(door);
+  door.position.set(0, 1.45, d / 2 - 3.19);
+  bGrp.add(door);
 
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(4.5, 1.1, 0.4),
-    new THREE.MeshStandardMaterial({ color: st.accent, emissive: st.accent, emissiveIntensity: 1.2 })
+  // 騎樓頂部天花板
+  const ceiling = new THREE.Mesh(new THREE.BoxGeometry(w, 0.35, 3.4), wallMat);
+  ceiling.position.set(0, 3.3, d / 2 - 1.7);
+  bGrp.add(ceiling);
+
+  // 騎樓支撐方柱 (Square Pillars)
+  const pMat = new THREE.MeshStandardMaterial({ color: '#2d3748', roughness: 0.7 });
+  const pLeft = new THREE.Mesh(new THREE.BoxGeometry(0.55, 3.3, 0.55), pMat);
+  pLeft.position.set(-w / 2 + 0.45, 1.65, d / 2 - 0.35);
+  const pRight = new THREE.Mesh(new THREE.BoxGeometry(0.55, 3.3, 0.55), pMat);
+  pRight.position.set(w / 2 - 0.45, 1.65, d / 2 - 0.35);
+  bGrp.add(pLeft, pRight);
+
+  // 騎樓盆栽造景
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.42, 8), new THREE.MeshStandardMaterial({ color: '#b45309' }));
+  pot.position.set(-w / 2 + 1.1, 0.21, d / 2 - 0.35);
+  const plant = new THREE.Mesh(new THREE.DodecahedronGeometry(0.32), new THREE.MeshStandardMaterial({ color: '#15803d' }));
+  plant.position.set(-w / 2 + 1.1, 0.52, d / 2 - 0.35);
+  bGrp.add(pot, plant);
+
+  // 2. 二至四樓公寓立面 (2F ~ 4F Facade)
+  const upperGeo = new THREE.BoxGeometry(w, h - 3.4, d);
+  const upper = new THREE.Mesh(upperGeo, wallMat);
+  upper.position.set(0, 3.4 + (h - 3.4) / 2, 0);
+  upper.castShadow = true;
+  upper.receiveShadow = true;
+  bGrp.add(upper);
+
+  // 深開窗與暖黃夜間窗光
+  const winGeo = new THREE.BoxGeometry(1.6, 1.5, 0.08);
+  const winMatOn = new THREE.MeshStandardMaterial({
+    color: '#fef08a',
+    emissive: '#d97706',
+    emissiveIntensity: 0.65,
+    roughness: 0.2
+  });
+  const winMatOff = new THREE.MeshStandardMaterial({
+    color: '#1e293b',
+    emissive: '#0f172a',
+    emissiveIntensity: 0.1,
+    roughness: 0.5
+  });
+
+  for (let fl = 0; fl < 3; fl++) {
+    const yWin = 4.8 + fl * 2.8;
+    const w1 = new THREE.Mesh(winGeo, Math.random() > 0.35 ? winMatOn : winMatOff);
+    w1.position.set(-2.2, yWin, d / 2 + 0.02);
+    const w2 = new THREE.Mesh(winGeo, Math.random() > 0.35 ? winMatOn : winMatOff);
+    w2.position.set(2.2, yWin, d / 2 + 0.02);
+    bGrp.add(w1, w2);
+
+    // 冷氣室外機 (AC Units)
+    if (fl % 2 === 0) {
+      const ac = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.6, 0.45),
+        new THREE.MeshStandardMaterial({ color: '#cbd5e1', roughness: 0.4, metalness: 0.3 })
+      );
+      ac.position.set(-0.6, yWin - 0.35, d / 2 + 0.25);
+      bGrp.add(ac);
+    }
+  }
+
+  // 3. 頂樓女兒牆與水塔
+  const parapet = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.65, d + 0.2), wallMat);
+  parapet.position.set(0, h + 0.32, 0);
+  bGrp.add(parapet);
+
+  const tank = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.75, 0.75, 1.5, 14),
+    new THREE.MeshStandardMaterial({ color: '#e2e8f0', metalness: 0.85, roughness: 0.2 })
   );
-  sign.position.set(0, 4.8, 3.7);
-  sGroup.add(sign);
+  tank.position.set(-2.1, h + 1.1, -1.6);
+  bGrp.add(tank);
 
-  const marker = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.7, 0),
-    new THREE.MeshStandardMaterial({ color: st.accent, emissive: st.accent, emissiveIntensity: 1.5, wireframe: true })
-  );
-  marker.position.set(0, 7.2, 0);
-  sGroup.add(marker);
+  // 4. 台北靈魂：凸出式直立懸掛霓虹招牌 (Vertical Blade Sign)
+  const neonCol = st.col || '#00f5d4';
+  const bladeTex = createNeonSignTexture(st.short, neonCol, '#090d16', true);
+  const bladeGeo = new THREE.BoxGeometry(0.12, 5.0, 1.4);
+  const bladeMat = new THREE.MeshStandardMaterial({
+    map: bladeTex,
+    emissive: neonCol,
+    emissiveIntensity: 0.8,
+    roughness: 0.2
+  });
+  const bladeSign = new THREE.Mesh(bladeGeo, bladeMat);
+  bladeSign.position.set(w / 2 + 0.08, 7.5, d / 2 - 0.6);
+  bGrp.add(bladeSign);
 
-  sGroup.position.set(st.x, 0, st.z);
-  cityGroup.add(sGroup);
+  // 招牌金屬固定橫桿 (Mounting Struts)
+  const strutMat = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.8 });
+  const sTop = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 6), strutMat);
+  sTop.rotation.z = Math.PI / 2;
+  sTop.position.set(w / 2 + 0.42, 9.4, d / 2 - 0.6);
+  const sBot = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 6), strutMat);
+  sBot.rotation.z = Math.PI / 2;
+  sBot.position.set(w / 2 + 0.42, 5.6, d / 2 - 0.6);
+  bGrp.add(sTop, sBot);
+
+  // 5. 頂樓橫式發光霓虹大燈箱 (Rooftop Lightbox Sign)
+  const roofSignTex = createNeonSignTexture(`🎭 ${st.short}`, st.accent || '#ffd25e', '#0b0f19', false);
+  const roofSignMat = new THREE.MeshStandardMaterial({
+    map: roofSignTex,
+    emissive: st.accent || '#ffd25e',
+    emissiveIntensity: 0.85,
+    roughness: 0.2
+  });
+  const roofSign = new THREE.Mesh(new THREE.BoxGeometry(4.8, 1.35, 0.35), roofSignMat);
+  roofSign.position.set(0, h + 1.15, d / 2 - 0.2);
+  bGrp.add(roofSign);
+
+  // 6. 接觸陰影 (Contact Shadow)
+  bGrp.add(createContactShadow(w + 3.5, d + 3.5, 0.55));
+
+  // 7. 3D POI 懸浮標記 (門口前方的立體面具)
+  const poiPin = create3DPOIPin('mask', neonCol);
+  poiPin.position.set(0, 0, d / 2 + 2.2);
+  bGrp.add(poiPin);
+
+  // 8. 霓虹光柱 (供劇本類型篩選聯動)
+  const beaconGeo = new THREE.CylinderGeometry(0.8, 1.4, 45, 16, 1, true);
+  const beaconMat = new THREE.MeshBasicMaterial({
+    color: st.accent || '#ffd25e',
+    transparent: true,
+    opacity: 0.0,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+  beacon.position.y = h + 22.5;
+  beacon.visible = false;
+  bGrp.add(beacon);
+
+  bGrp.position.set(st.x, 0, st.z);
+  cityGroup.add(bGrp);
+
+  return {
+    group: bGrp,
+    bldgMat: wallMat,
+    poiPin: poiPin,
+    beacon: beacon,
+    beaconMat: beaconMat
+  };
+}
+
+STORES.forEach(st => {
+  const bldgObj = createTaipeiStoreBuilding(st);
 
   const poiObj = {
     type: 'store',
     data: st,
     pos: new THREE.Vector3(st.x, 0, st.z),
-    marker: marker,
-    interact: () => enterStore(st)
+    group: bldgObj.group,
+    bldgMat: bldgObj.bldgMat,
+    poiPin: bldgObj.poiPin,
+    beacon: bldgObj.beacon,
+    beaconMat: bldgObj.beaconMat,
+    interact: () => {
+      openStoreBottomSheet(st);
+    }
   };
   interactiveObjects.push(poiObj);
   storeMeshes.push(poiObj);
@@ -1933,6 +2491,14 @@ function animate() {
       controls.update();
     }
   }
+
+  // 2.0 3D POI 互動標記立體懸浮浮動動效
+  animatedPins.forEach((pin, pIdx) => {
+    if (pin.stem) {
+      pin.stem.position.y = 3.6 + Math.sin(now * 0.0028 + pIdx * 0.8) * 0.22;
+      pin.stem.rotation.y = Math.sin(now * 0.0015 + pIdx) * 0.25;
+    }
+  });
 
   // 2.0 線索道具微旋轉與懸浮動效
   clueMeshes.forEach(cm => {
