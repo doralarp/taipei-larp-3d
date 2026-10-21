@@ -286,6 +286,20 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--navy
 /* 鎖定 Canvas 容器觸控行為，防止意外下拉重整 */
 #canvas-container, #webgl { touch-action: none; }
 
+
+/* 迷你能力值進度條 */
+.mini-stat-track {
+  width: 32px; height: 5px; background: rgba(0,0,0,0.5); border-radius: 3px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12); margin: 0 2px;
+}
+.mini-stat-fill {
+  height: 100%; width: 20%; background: linear-gradient(90deg, #f59e0b, #ffd25e);
+  border-radius: 3px; transition: width .3s ease;
+}
+.stat-badge:hover .mini-stat-fill {
+  background: linear-gradient(90deg, #00f5d4, #38bdf8);
+}
+
 </style>
 </head>
 <body>
@@ -321,13 +335,32 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--navy
     </div>
   </div>
 
-  <!-- 五維能力核心徽章列 -->
+  <!-- 五維能力核心徽章列 (附小型視覺化進度條) -->
   <div class="hud-glass hud-stats-bar">
-    <div class="stat-badge" data-stat="logic" title="點擊查看能力詳情"><i>🔍</i><span class="name">推理力</span><span class="val" id="stat-logic">Lv.2 (20)</span></div>
-    <div class="stat-badge" data-stat="heart" title="點擊查看能力詳情"><i>💖</i><span class="name">共情力</span><span class="val" id="stat-heart">Lv.2 (20)</span></div>
-    <div class="stat-badge" data-stat="nerve" title="點擊查看能力詳情"><i>🔥</i><span class="name">膽識</span><span class="val" id="stat-nerve">Lv.2 (20)</span></div>
-    <div class="stat-badge" data-stat="mech" title="點擊查看能力詳情"><i>♟️</i><span class="name">策略力</span><span class="val" id="stat-mech">Lv.2 (20)</span></div>
-    <div class="stat-badge" data-stat="rep" title="點擊查看名譽詳情"><i>👑</i><span class="name">名譽</span><span class="val" id="stat-rep">50</span></div>
+    <div class="stat-badge" data-stat="logic" title="點擊查看能力詳情">
+      <i>🔍</i><span class="name">推理</span>
+      <div class="mini-stat-track"><div class="mini-stat-fill" id="stat-fill-logic"></div></div>
+      <span class="val" id="stat-logic">Lv.2 20</span>
+    </div>
+    <div class="stat-badge" data-stat="heart" title="點擊查看能力詳情">
+      <i>💖</i><span class="name">共情</span>
+      <div class="mini-stat-track"><div class="mini-stat-fill" id="stat-fill-heart"></div></div>
+      <span class="val" id="stat-heart">Lv.2 20</span>
+    </div>
+    <div class="stat-badge" data-stat="nerve" title="點擊查看能力詳情">
+      <i>🔥</i><span class="name">膽識</span>
+      <div class="mini-stat-track"><div class="mini-stat-fill" id="stat-fill-nerve"></div></div>
+      <span class="val" id="stat-nerve">Lv.2 20</span>
+    </div>
+    <div class="stat-badge" data-stat="mech" title="點擊查看能力詳情">
+      <i>♟️</i><span class="name">策略</span>
+      <div class="mini-stat-track"><div class="mini-stat-fill" id="stat-fill-mech"></div></div>
+      <span class="val" id="stat-mech">Lv.2 20</span>
+    </div>
+    <div class="stat-badge" data-stat="rep" title="點擊查看名譽詳情">
+      <i>👑</i><span class="name">名譽</span>
+      <span class="val" id="stat-rep">50</span>
+    </div>
   </div>
 </div>
 

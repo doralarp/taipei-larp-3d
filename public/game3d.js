@@ -1480,60 +1480,333 @@ MATES.forEach((m, idx) => {
 });
 
 // ==========================================
-// 10. 3D STORE INTERIOR SYSTEM (SEAMLESS ZOOM)
+// ==========================================
+// 10. 3D STORE INTERIOR SYSTEM (FLAGSHIP LARP PARLOR)
 // ==========================================
 let currentInsideStore = null;
 const roomGroup = new THREE.Group();
 roomGroup.position.set(0, -60, 0);
 scene.add(roomGroup);
 
+const indoorInteractive = [];
+
+// 輔助函式：建立劇本盒封面貼圖 (Procedural Script Box Cover)
+function createScriptBoxTexture(title, genreCol = '#ef4444', caseNo = 'NO.042') {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 192;
+  const ctx = c.getContext('2d');
+  
+  // 深黑/暗紅復古底板
+  ctx.fillStyle = '#0f121d';
+  ctx.fillRect(0, 0, 128, 192);
+
+  // 金色飾邊
+  ctx.strokeStyle = genreCol;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(4, 4, 120, 184);
+
+  // 頂部案件編號
+  ctx.fillStyle = genreCol;
+  ctx.font = 'bold 13px "Plus Jakarta Sans", monospace';
+  ctx.fillText(caseNo, 12, 22);
+
+  // 劇本標題
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 18px "Noto Sans TC", sans-serif';
+  ctx.fillText(title.substring(0, 5), 12, 60);
+  if (title.length > 5) {
+    ctx.fillText(title.substring(5, 10), 12, 86);
+  }
+
+  // 底部印章 (Red Wax Stamp)
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(96, 150, 16, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#ef4444';
+  ctx.font = '10px "Noto Sans TC"';
+  ctx.fillText('機密', 86, 154);
+
+  return new THREE.CanvasTexture(c);
+}
+
 function buildStoreInteriorRoom() {
   roomGroup.clear();
+  indoorInteractive.length = 0;
 
-  const rFloor = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), new THREE.MeshStandardMaterial({ color: '#271e1b', roughness: 0.6 }));
+  // 1. 室內地面：深色拼花復古木地板
+  const rFloor = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 20),
+    new THREE.MeshStandardMaterial({ color: '#1c1614', roughness: 0.65, metalness: 0.1 })
+  );
   rFloor.rotation.x = -Math.PI / 2;
   rFloor.receiveShadow = true;
   roomGroup.add(rFloor);
 
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#16192b', roughness: 0.8 });
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(18, 7, 0.4), wallMat);
-  backWall.position.set(0, 3.5, -9);
+  // 2. 高級紅金波斯幾何軟地毯 (Persian Rug under Game Table)
+  const rugMat = new THREE.MeshStandardMaterial({ color: '#7f1d1d', roughness: 0.85, metalness: 0.05 });
+  const rug = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 6.2), rugMat);
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.set(-2.2, 0.015, 1.2);
+  rug.receiveShadow = true;
+  roomGroup.add(rug);
+
+  // 3. 牆面 (復古胡桃木護牆板 + 深墨綠/灰紫壁紙)
+  const wallMat = new THREE.MeshStandardMaterial({ color: '#141824', roughness: 0.85 });
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(20, 8.5, 0.4), wallMat);
+  backWall.position.set(0, 4.25, -10);
   backWall.receiveShadow = true;
   roomGroup.add(backWall);
 
-  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 7, 18), wallMat);
-  leftWall.position.set(-9, 3.5, 0);
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 8.5, 20), wallMat);
+  leftWall.position.set(-10, 4.25, 0);
   leftWall.receiveShadow = true;
   roomGroup.add(leftWall);
 
-  const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.3, 24), new THREE.MeshStandardMaterial({ color: '#451a03', roughness: 0.5 }));
-  tableTop.position.y = 1.4;
-  tableTop.castShadow = true;
-  tableTop.receiveShadow = true;
-  roomGroup.add(tableTop);
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.4, 8.5, 20), wallMat);
+  rightWall.position.set(10, 4.25, 0);
+  rightWall.receiveShadow = true;
+  roomGroup.add(rightWall);
 
-  const tableLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1.4, 12), new THREE.MeshStandardMaterial({ color: '#291104' }));
-  tableLeg.position.y = 0.7;
-  roomGroup.add(tableLeg);
+  // 4. 左側大型台北雨夜景觀窗 (Rainy Taipei Window Wall)
+  const winFrameMat = new THREE.MeshStandardMaterial({ color: '#090d16', metalness: 0.8, roughness: 0.3 });
+  const winGlassMat = new THREE.MeshStandardMaterial({
+    color: '#1e293b',
+    emissive: '#0f172a',
+    emissiveIntensity: 0.35,
+    roughness: 0.1,
+    metalness: 0.9,
+    transparent: true,
+    opacity: 0.7
+  });
+  const winGlass = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 5.0), winGlassMat);
+  winGlass.rotation.y = Math.PI / 2;
+  winGlass.position.set(-9.78, 4.5, 0);
+  roomGroup.add(winGlass);
 
-  const scriptCardMat = new THREE.MeshStandardMaterial({ color: '#ffd25e' });
-  for (let i = 0; i < 6; i++) {
-    const sc = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 1.1), scriptCardMat);
-    const a = (i / 6) * Math.PI * 2;
-    sc.position.set(Math.cos(a) * 2.2, 1.58, Math.sin(a) * 2.2);
-    sc.rotation.y = -a;
-    roomGroup.add(sc);
+  // 5. 【第一優先：大型劇本陳列展示牆 (Script Showcase Wall)】
+  const shelfWoodMat = new THREE.MeshStandardMaterial({ color: '#2d1810', roughness: 0.65 });
+  const shelfGroup = new THREE.Group();
+  shelfGroup.position.set(-2.8, 0, -9.3);
+
+  // 書架外框與 4 層隔板
+  const shelfBack = new THREE.Mesh(new THREE.BoxGeometry(8.2, 6.5, 0.3), shelfWoodMat);
+  shelfBack.position.y = 3.25;
+  shelfGroup.add(shelfBack);
+
+  for (let l = 0; l <= 4; l++) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.18, 0.95), shelfWoodMat);
+    plank.position.set(0, 0.6 + l * 1.35, 0.35);
+    shelfGroup.add(plank);
   }
 
-  const hostModel = createChibiModel('#1e1b4b', '#d97706', true);
-  hostModel.group.position.set(0, 0, -2.6);
-  roomGroup.add(hostModel.group);
+  // 分類標牌板
+  const catNames = ['【硬核推理】', '【沉浸情感】', '【微恐懸疑】', '【機制陣營】'];
+  const catColors = ['#38bdf8', '#f43f5e', '#a855f7', '#f59e0b'];
 
-  const spotLight = new THREE.SpotLight('#fde047', 2.2, 25, Math.PI / 4, 0.4);
-  spotLight.position.set(0, 9, 0);
-  spotLight.target = tableTop;
-  spotLight.castShadow = true;
-  roomGroup.add(spotLight);
+  const scriptBoxColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
+  const sampleTitles = ['黑日', '莫格街', '琢玉', '百鬼夜行', '手寫從前', '良辰吉日', '病嬌', '艾希什', '宿醉', '二手名著'];
+
+  // 陳列數十盒立體劇本盒 (直立、橫放、微斜)
+  for (let row = 0; row < 4; row++) {
+    const yTier = 0.6 + row * 1.35 + 0.55;
+    let xOffset = -3.5;
+    while (xOffset < 3.2) {
+      const boxW = 0.35 + Math.random() * 0.25;
+      const boxH = 0.85 + Math.random() * 0.25;
+      const boxD = 0.7;
+      const bColor = scriptBoxColors[Math.floor(Math.random() * scriptBoxColors.length)];
+      const title = sampleTitles[Math.floor(Math.random() * sampleTitles.length)];
+
+      const isSpecial = Math.random() < 0.2; // 稀有特本
+      const boxMat = new THREE.MeshStandardMaterial({
+        color: bColor,
+        roughness: 0.35,
+        emissive: isSpecial ? '#ffd25e' : '#000000',
+        emissiveIntensity: isSpecial ? 0.35 : 0
+      });
+
+      const sBox = new THREE.Mesh(new THREE.BoxGeometry(boxW, boxH, boxD), boxMat);
+      sBox.position.set(xOffset + boxW / 2, yTier, 0.35);
+      if (Math.random() < 0.25) sBox.rotation.z = (Math.random() - 0.5) * 0.18; // 微傾斜
+      sBox.castShadow = true;
+      shelfGroup.add(sBox);
+
+      xOffset += boxW + 0.12;
+    }
+  }
+
+  // 劇本牆專屬投射聚光燈
+  const shelfSpot = new THREE.SpotLight('#fef08a', 2.8, 16, Math.PI / 4, 0.3);
+  shelfSpot.position.set(-2.8, 7.5, -4.5);
+  shelfSpot.target = shelfBack;
+  shelfSpot.castShadow = true;
+  roomGroup.add(shelfSpot);
+
+  roomGroup.add(shelfGroup);
+
+  // 劇本牆空間互動點
+  indoorInteractive.push({
+    type: 'scripts',
+    name: '檢視劇本牆（挑選劇本）',
+    pos: new THREE.Vector3(-2.8, 0, -7.0),
+    interact: () => {
+      if (currentInsideStore) openScriptBrowser(currentInsideStore);
+    }
+  });
+
+  // 6. 【第二優先：主持人接待櫃台 (GM Counter)】
+  const counterGroup = new THREE.Group();
+  counterGroup.position.set(5.8, 0, -4.8);
+
+  // L 型木質接待檯面
+  const cWoodMat = new THREE.MeshStandardMaterial({ color: '#2e190e', roughness: 0.55 });
+  const cFront = new THREE.Mesh(new THREE.BoxGeometry(3.6, 1.25, 1.1), cWoodMat);
+  cFront.position.set(0, 0.625, 0);
+  cFront.castShadow = true;
+  counterGroup.add(cFront);
+
+  const cSide = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.25, 2.4), cWoodMat);
+  cSide.position.set(1.35, 0.625, 1.2);
+  cSide.castShadow = true;
+  counterGroup.add(cSide);
+
+  // 櫃檯桌面道具：綠色復古銀行家檯燈 (Banker's Lamp)
+  const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.08, 8), new THREE.MeshStandardMaterial({ color: '#d97706', metalness: 0.8 }));
+  lampBase.position.set(-0.8, 1.3, 0);
+  const lampShade = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.22), new THREE.MeshStandardMaterial({ color: '#047857', roughness: 0.2, emissive: '#10b981', emissiveIntensity: 0.4 }));
+  lampShade.position.set(-0.8, 1.6, 0);
+  counterGroup.add(lampBase, lampShade);
+
+  // 案件資料夾與手搖飲杯
+  const folder = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.06, 0.5), new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.8 }));
+  folder.position.set(0.4, 1.28, 0.1);
+  folder.rotation.y = 0.2;
+  counterGroup.add(folder);
+
+  const bobaCup = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.32, 8), new THREE.MeshStandardMaterial({ color: '#06b6d4', roughness: 0.3 }));
+  bobaCup.position.set(1.0, 1.4, 0);
+  counterGroup.add(bobaCup);
+
+  // 今日推薦小黑板 (Blackboard Stand)
+  const boardMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.9 });
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.95, 0.08), boardMat);
+  board.position.set(-1.3, 1.75, 0.2);
+  counterGroup.add(board);
+
+  // 主持人 GM 站在櫃台後方
+  const hostModel = createChibiModel('#1e1b4b', '#d97706', true);
+  hostModel.group.position.set(0.2, 0, -1.2);
+  counterGroup.add(hostModel.group);
+
+  roomGroup.add(counterGroup);
+
+  // 櫃台空間互動點
+  indoorInteractive.push({
+    type: 'host',
+    name: '與主持人交談（案件情報）',
+    pos: new THREE.Vector3(5.2, 0, -3.2),
+    interact: () => {
+      if (currentInsideStore) {
+        const host = HOSTS.find(h => (h.venues || []).includes(currentInsideStore.n)) || HOSTS[0];
+        talkToHost(host, currentInsideStore);
+      }
+    }
+  });
+
+  // 7. 【第三優先：遊戲長桌與包廂 (Game Table & Booth Narrative)】
+  const tableGroup = new THREE.Group();
+  tableGroup.position.set(-2.2, 0, 1.2);
+
+  // 實木厚實圓形/長型圍讀長桌
+  const tableMat = new THREE.MeshStandardMaterial({ color: '#381e11', roughness: 0.5, metalness: 0.1 });
+  const tableTop = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.32, 24), tableMat);
+  tableTop.position.y = 1.35;
+  tableTop.castShadow = true;
+  tableTop.receiveShadow = true;
+  tableGroup.add(tableTop);
+
+  const tableLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.8, 1.35, 12), new THREE.MeshStandardMaterial({ color: '#1a0d07' }));
+  tableLeg.position.y = 0.68;
+  tableGroup.add(tableLeg);
+
+  // 桌面敘事道具 (Character Dossiers, Clues, Hourglass, Magnifier)
+  const dossierMat = new THREE.MeshStandardMaterial({ color: '#fde68a', roughness: 0.7 });
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    // 角色劇本冊
+    const dos = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.04, 0.95), dossierMat);
+    dos.position.set(Math.cos(angle) * 2.3, 1.52, Math.sin(angle) * 2.3);
+    dos.rotation.y = -angle;
+    tableGroup.add(dos);
+
+    // 舒適扶手椅 (Armchair)
+    const chair = new THREE.Group();
+    const cSeat = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 0.9), new THREE.MeshStandardMaterial({ color: '#7f1d1d', roughness: 0.8 }));
+    cSeat.position.y = 0.75;
+    chair.add(cSeat);
+
+    const cBack = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.85, 0.15), new THREE.MeshStandardMaterial({ color: '#7f1d1d', roughness: 0.8 }));
+    cBack.position.set(0, 1.15, -0.4);
+    chair.add(cBack);
+
+    chair.position.set(Math.cos(angle) * 3.4, 0, Math.sin(angle) * 3.4);
+    chair.rotation.y = -angle + Math.PI / 2;
+    tableGroup.add(chair);
+  }
+
+  // 桌面中心：黃銅復古放大鏡與沙漏
+  const centerProp = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.05, 8, 16), new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.8 }));
+  centerProp.rotation.x = Math.PI / 2;
+  centerProp.position.set(0, 1.54, 0);
+  tableGroup.add(centerProp);
+
+  // 桌頂工業復古吊燈與聚光燈
+  const lampCone = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.5, 12, 1, true), new THREE.MeshStandardMaterial({ color: '#1e293b', metalness: 0.6 }));
+  lampCone.position.set(0, 6.2, 0);
+  tableGroup.add(lampCone);
+
+  const tableSpot = new THREE.SpotLight('#fef08a', 3.2, 20, Math.PI / 3.5, 0.4);
+  tableSpot.position.set(0, 6.0, 0);
+  tableSpot.target = tableTop;
+  tableSpot.castShadow = true;
+  tableGroup.add(tableSpot);
+
+  roomGroup.add(tableGroup);
+
+  // 遊戲桌空間互動點
+  indoorInteractive.push({
+    type: 'table',
+    name: '整理桌面與場務打工',
+    pos: new THREE.Vector3(-2.2, 0, 2.2),
+    interact: () => {
+      if (currentInsideStore) doStaffJob(currentInsideStore);
+    }
+  });
+
+  // 8. 出口大門 (Exit Doorway)
+  const doorFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(3.2, 4.0, 0.3),
+    new THREE.MeshStandardMaterial({ color: '#0f172a' })
+  );
+  doorFrame.position.set(0, 2.0, 9.8);
+  roomGroup.add(doorFrame);
+
+  // 綠色發光 EXIT 指示燈
+  const exitSign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.9, 0.35, 0.12),
+    new THREE.MeshStandardMaterial({ color: '#10b981', emissive: '#10b981', emissiveIntensity: 1.2 })
+  );
+  exitSign.position.set(0, 4.3, 9.7);
+  roomGroup.add(exitSign);
+
+  indoorInteractive.push({
+    type: 'exit',
+    name: '走出店門（回台北街頭）',
+    pos: new THREE.Vector3(0, 0, 7.8),
+    interact: exitStore
+  });
 }
 buildStoreInteriorRoom();
 
@@ -1541,20 +1814,46 @@ function enterStore(st) {
   AudioEngine.sfx('stamp');
   currentInsideStore = st;
   S.insideStore = st.s;
+  if (!S.storePlays) S.storePlays = {};
   S.storePlays[st.s] = (S.storePlays[st.s] || 0);
 
-  document.getElementById('room-ui').hidden = false;
-  document.getElementById('hud-location').textContent = st.n + ' · 店內';
-  showToast(`歡迎來到「${st.n}」！`);
+  // 隱藏室外地圖，將相機切換至店內微縮視角
+  document.getElementById('hud-location').textContent = st.n + ' · 旗艦店內';
+  showToast(`歡迎來到「${st.n}」！可在店內自由走動探索。`);
+  
+  // 角色移至店內門口位置
+  player.pos.set(0, 0, 6.2);
+  player.targetPos.set(0, 0, 6.2);
+  player.moving = false;
+
+  // 相機平滑切換至室內
+  smoothMoveCamera(
+    new THREE.Vector3(0, -50.5, 14.5),
+    new THREE.Vector3(0, -58.5, -0.5),
+    0.85
+  );
 }
 
 function exitStore() {
   AudioEngine.sfx('click');
+  const lastSt = currentInsideStore;
   currentInsideStore = null;
   S.insideStore = null;
-  document.getElementById('room-ui').hidden = true;
   document.getElementById('hud-location').textContent = '台北車站 · 忠孝西路';
-  showToast('回到了台北街頭。');
+  showToast('回到了台北夜景街頭。');
+
+  // 角色歸位到店門外
+  if (lastSt) {
+    player.pos.set(lastSt.x, 0, lastSt.z + 5.5);
+    player.targetPos.copy(player.pos);
+  }
+
+  // 相機平滑回歸室外等角跟隨
+  smoothMoveCamera(
+    player.pos.clone().add(CAM_OFFSET),
+    player.pos.clone(),
+    0.85
+  );
 }
 
 document.getElementById('btn-room-exit').onclick = exitStore;
@@ -2348,7 +2647,19 @@ window.addEventListener('pointerdown', e => {
 });
 
 function checkImmediateInteraction() {
-  if (currentInsideStore) return;
+  if (currentInsideStore) {
+    let nearest = null;
+    let minDist = 3.4;
+    indoorInteractive.forEach(poi => {
+      const d = poi.pos.distanceTo(player.pos);
+      if (d < minDist) {
+        minDist = d;
+        nearest = poi;
+      }
+    });
+    if (nearest && nearest.interact) nearest.interact();
+    return;
+  }
   let nearest = null;
   let minDist = 3.6;
 
@@ -2416,8 +2727,76 @@ function animate() {
   updateDayNightCycle();
 
   if (currentInsideStore) {
-    camera.position.lerp(new THREE.Vector3(0, -48, 14), 0.08);
-    camera.lookAt(new THREE.Vector3(0, -58.5, 0));
+    // 店內相機固定在最佳觀測俯視角度
+    if (!cameraAnim) {
+      camera.position.lerp(new THREE.Vector3(0, -50.5, 14.5), 0.08);
+      camera.lookAt(new THREE.Vector3(0, -58.5, -0.5));
+    } else {
+      const elapsed = performance.now() - cameraAnim.startTime;
+      const progress = Math.min(elapsed / cameraAnim.duration, 1.0);
+      const ease = 0.5 - 0.5 * Math.cos(progress * Math.PI);
+      camera.position.lerpVectors(cameraAnim.startPos, cameraAnim.endPos, ease);
+      currentLookTarget.lerpVectors(cameraAnim.startLook, cameraAnim.endLook, ease);
+      camera.lookAt(currentLookTarget);
+      if (progress >= 1.0) cameraAnim = null;
+    }
+
+    // 玩家在店內自由移動 (限制在店內空間邊界 x: -7.5~7.5, z: -8~7.5)
+    const moveDir = new THREE.Vector3(0, 0, 0);
+    if (keys['w'] || keys['arrowup']) moveDir.z -= 1;
+    if (keys['s'] || keys['arrowdown']) moveDir.z += 1;
+    if (keys['a'] || keys['arrowleft']) moveDir.x -= 1;
+    if (keys['d'] || keys['arrowright']) moveDir.x += 1;
+
+    if (moveDir.lengthSq() > 0) {
+      moveDir.normalize();
+      player.pos.addScaledVector(moveDir, player.speed * dt);
+      player.targetPos.copy(player.pos);
+      player.moving = true;
+      playerModel.group.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+      playerModel.animateWalk(player.speed);
+    } else if (player.moving) {
+      const diff = new THREE.Vector3().subVectors(player.targetPos, player.pos);
+      if (diff.length() > 0.2) {
+        diff.normalize();
+        player.pos.addScaledVector(diff, player.speed * dt);
+        playerModel.group.rotation.y = Math.atan2(diff.x, diff.z);
+        playerModel.animateWalk(player.speed);
+      } else {
+        player.moving = false;
+        playerModel.resetIdle();
+      }
+    } else {
+      playerModel.resetIdle();
+    }
+
+    player.pos.x = Math.max(-7.5, Math.min(7.5, player.pos.x));
+    player.pos.z = Math.max(-8.0, Math.min(7.8, player.pos.z));
+    playerModel.group.position.set(player.pos.x, -60, player.pos.z);
+
+    // 檢測店內情境互動點 (靠近劇本牆、櫃台、桌子、門口)
+    let nearestInd = null;
+    let minIndDist = 3.2;
+    indoorInteractive.forEach(poi => {
+      const d = poi.pos.distanceTo(player.pos);
+      if (d < minIndDist) {
+        minIndDist = d;
+        nearestInd = poi;
+      }
+    });
+
+    if (nearestInd) {
+      promptText.textContent = nearestInd.name;
+      const screenPos = nearestInd.pos.clone().add(new THREE.Vector3(0, -57.2, 0)).project(camera);
+      const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+      promptBubble.style.left = sx + 'px';
+      promptBubble.style.top = sy + 'px';
+      promptBubble.classList.add('show');
+    } else {
+      promptBubble.classList.remove('show');
+    }
+
     renderer.render(scene, camera);
     return;
   }
