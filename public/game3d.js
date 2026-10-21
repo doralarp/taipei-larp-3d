@@ -1163,6 +1163,16 @@ function createTaipeiStoreBuilding(st) {
   bGrp.add(beacon);
 
   bGrp.position.set(st.x, 0, st.z);
+  // 街屋面向主幹道 (若在路北面向南，若在路南面向北)
+  if (st.z > 2) {
+    bGrp.rotation.y = Math.PI;
+  } else if (st.z < -2) {
+    bGrp.rotation.y = 0;
+  } else if (st.x > 0) {
+    bGrp.rotation.y = -Math.PI / 2;
+  } else {
+    bGrp.rotation.y = Math.PI / 2;
+  }
   cityGroup.add(bGrp);
 
   return {
@@ -1369,44 +1379,139 @@ function collectClue(cDef, clueObj) {
 // ==========================================
 function createChibiModel(hairColor = '#3b2818', jacketColor = '#3b82f6', isLongHair = false) {
   const model = new THREE.Group();
+  const skinMat = new THREE.MeshStandardMaterial({ color: '#fde0c7', roughness: 0.65 });
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshStandardMaterial({ color: '#ffe4c4', roughness: 0.8 }));
-  head.position.y = 1.6;
+  // 1. 頭部 (Head)
+  const headGeo = new THREE.BoxGeometry(0.78, 0.78, 0.78);
+  const head = new THREE.Mesh(headGeo, skinMat);
+  head.position.y = 1.62;
   head.castShadow = true;
   model.add(head);
 
-  const hair = new THREE.Mesh(new THREE.BoxGeometry(0.86, isLongHair ? 0.7 : 0.4, 0.86), new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.6 }));
-  hair.position.set(0, 1.85, isLongHair ? 0.05 : 0);
-  model.add(hair);
+  // 2. 髮型 (Hair with Bangs & Volume)
+  const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.55 });
+  const hairTop = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.42, 0.84), hairMat);
+  hairTop.position.set(0, 1.88, 0);
+  model.add(hairTop);
 
-  const eyeMat = new THREE.MeshBasicMaterial({ color: '#1e1b4b' });
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.05), eyeMat);
-  eyeL.position.set(-0.2, 1.6, 0.41);
-  const eyeR = eyeL.clone();
-  eyeR.position.x = 0.2;
+  // 劉海 (Bangs)
+  const bangs = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.22, 0.16), hairMat);
+  bangs.position.set(0, 1.85, 0.38);
+  model.add(bangs);
+
+  // 後髮 / 長髮
+  if (isLongHair) {
+    const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.65, 0.22), hairMat);
+    hairBack.position.set(0, 1.55, -0.38);
+    model.add(hairBack);
+  }
+
+  // 雙眼與眼神光 (Eyes with catchlights)
+  const eyeMat = new THREE.MeshBasicMaterial({ color: '#18182b' });
+  const eyeLightMat = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.16, 0.04), eyeMat);
+  eyeL.position.set(-0.2, 1.62, 0.41);
+  const catchL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.05), eyeLightMat);
+  catchL.position.set(-0.22, 1.66, 0.42);
   model.add(eyeL);
-  model.add(eyeR);
+  model.add(catchL);
 
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.75, 0.45), new THREE.MeshStandardMaterial({ color: jacketColor, roughness: 0.7 }));
-  body.position.y = 0.95;
+  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.16, 0.04), eyeMat);
+  eyeR.position.set(0.2, 1.62, 0.41);
+  const catchR = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.05), eyeLightMat);
+  catchR.position.set(0.18, 1.66, 0.42);
+  model.add(eyeR);
+  model.add(catchR);
+
+  // 腮紅 (Blush)
+  const blushMat = new THREE.MeshBasicMaterial({ color: '#fca5a5', transparent: true, opacity: 0.6 });
+  const blushL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.02), blushMat);
+  blushL.position.set(-0.26, 1.5, 0.41);
+  const blushR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.02), blushMat);
+  blushR.position.set(0.26, 1.5, 0.41);
+  model.add(blushL);
+  model.add(blushR);
+
+  // 3. 身體與夾克外套 (Torso, Jacket & Inner Collar)
+  const jacketMat = new THREE.MeshStandardMaterial({ color: jacketColor, roughness: 0.55 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.74, 0.46), jacketMat);
+  body.position.y = 0.98;
   body.castShadow = true;
   model.add(body);
 
-  const legMat = new THREE.MeshStandardMaterial({ color: '#1e293b' });
-  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.6, 0.25), legMat);
-  legL.position.set(-0.18, 0.3, 0);
-  legL.castShadow = true;
-  const legR = legL.clone();
-  legR.position.x = 0.18;
+  // 內搭衣領 (White/Light Collar V-neck)
+  const collarMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.8 });
+  const collar = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.06), collarMat);
+  collar.position.set(0, 1.25, 0.23);
+  model.add(collar);
+
+  // 斜背偵探包 / 行動腰包 (Messenger bag)
+  const bagMat = new THREE.MeshStandardMaterial({ color: '#78350f', roughness: 0.7 });
+  const strapMat = new THREE.MeshStandardMaterial({ color: '#451a03', roughness: 0.8 });
+  const bag = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.16), bagMat);
+  bag.position.set(0.36, 0.85, 0.12);
+  bag.rotation.y = 0.15;
+  model.add(bag);
+
+  const strap = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.08, 0.52), strapMat);
+  strap.position.set(0.04, 1.05, 0);
+  strap.rotation.z = -0.45;
+  model.add(strap);
+
+  // 4. 雙腿與球鞋 (Legs & Sneakers with white soles)
+  const pantsMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.8 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.6 });
+  const soleMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.4 });
+
+  function createLeg(xPos) {
+    const legGrp = new THREE.Group();
+    legGrp.position.set(xPos, 0.6, 0); // 旋轉軸設在大腿根部
+
+    const legMesh = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.5, 0.24), pantsMat);
+    legMesh.position.y = -0.25;
+    legMesh.castShadow = true;
+    legGrp.add(legMesh);
+
+    // 鞋身
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.32), shoeMat);
+    shoe.position.set(0, -0.48, 0.04);
+    shoe.castShadow = true;
+    legGrp.add(shoe);
+
+    // 鞋底 (White Sole)
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.04, 0.33), soleMat);
+    sole.position.set(0, -0.54, 0.04);
+    legGrp.add(sole);
+
+    return legGrp;
+  }
+
+  const legL = createLeg(-0.18);
+  const legR = createLeg(0.18);
   model.add(legL);
   model.add(legR);
 
-  const armMat = new THREE.MeshStandardMaterial({ color: jacketColor });
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.2), armMat);
-  armL.position.set(-0.46, 0.9, 0);
-  armL.castShadow = true;
-  const armR = armL.clone();
-  armR.position.x = 0.46;
+  // 5. 雙臂與小手 (Arms & Hands)
+  function createArm(xPos) {
+    const armGrp = new THREE.Group();
+    armGrp.position.set(xPos, 1.25, 0); // 肩膀樞紐
+
+    const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.42, 0.2), jacketMat);
+    armMesh.position.y = -0.21;
+    armMesh.castShadow = true;
+    armGrp.add(armMesh);
+
+    // 小圓拳頭手
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.18), skinMat);
+    hand.position.set(0, -0.44, 0);
+    armGrp.add(hand);
+
+    return armGrp;
+  }
+
+  const armL = createArm(-0.46);
+  const armR = createArm(0.46);
   model.add(armL);
   model.add(armR);
 
@@ -1415,20 +1520,22 @@ function createChibiModel(hairColor = '#3b2818', jacketColor = '#3b82f6', isLong
     head, body, legL, legR, armL, armR,
     animTime: 0,
     animateWalk(speed = 1) {
-      this.animTime += speed * 0.15;
+      this.animTime += speed * 0.16;
       const swing = Math.sin(this.animTime);
       this.legL.rotation.x = swing * 0.65;
       this.legR.rotation.x = -swing * 0.65;
       this.armL.rotation.x = -swing * 0.55;
       this.armR.rotation.x = swing * 0.55;
-      this.body.position.y = 0.95 + Math.abs(swing) * 0.08;
+      this.body.position.y = 0.98 + Math.abs(swing) * 0.06;
+      this.head.position.y = 1.62 + Math.abs(swing) * 0.04;
     },
     resetIdle() {
       this.legL.rotation.x = 0;
       this.legR.rotation.x = 0;
       this.armL.rotation.x = 0;
       this.armR.rotation.x = 0;
-      this.body.position.y = 0.95;
+      this.body.position.y = 0.98;
+      this.head.position.y = 1.62;
     }
   };
 }

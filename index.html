@@ -177,6 +177,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: var(--navy
 .dialog-opt-btn:hover { background: rgba(255, 210, 94, 0.15); border-color: var(--gold); transform: translateX(3px); }
 
 /* 店內 3D 空間覆蓋資訊 */
+#room-ui[hidden] { display: none !important; }
 #room-ui {
   position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 20;
   display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; pointer-events: auto;
