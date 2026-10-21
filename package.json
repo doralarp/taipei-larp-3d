@@ -1,0 +1,22 @@
+{
+  "name": "taipei-larp-3d",
+  "version": "1.0.0",
+  "description": "台北劇本殺物語 3D · 3D WebGL LARP RPG for Render.com",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "larp",
+    "threejs",
+    "3d",
+    "webgl",
+    "rpg"
+  ],
+  "author": "劇本迷哆啦",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
